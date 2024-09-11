@@ -1,0 +1,184 @@
+name: Terraform Lint, Security Check and plan
+
+on:
+  push:
+    branches:
+      - '**'        # matches every branch except main
+      - '!main'
+
+jobs:
+  Terraform-unit-test-plan-dev-env :
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      # This step is essential to ensure that the workflow is operating on the most recent version of the code stored in the repository. It uses the latest code base as the foundation for all subsequent steps.
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+     # Terraform must be installed on the runner to perform any Terraform-related operations. Specifying the version ensures consistency across environments, preventing version-related issues.
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+     # TFLint is installed to lint the Terraform code. It will check for errors, deprecated syntax, and enforce best practices, helping to maintain clean and error-free Terraform code.
+      - name: Install TFLint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+    # # tfsec is installed to perform security analysis on the Terraform code. It checks for misconfigurations and security vulnerabilities, ensuring that the infrastructure being deployed adheres to security best practices.
+    #   - name: Install tfsec
+    #     run: |
+    #       curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
+      # - name: Install Checkov
+      #   run: |
+      #     pip install checkov
+      
+      # - name: Install terraform-docs
+      #   run: |
+      #     curl -s https://i.jpillora.com/terraform-docs/install | bash
+
+    # AWS credentials are configured using the GitHub Secrets stored securely in the repository. This step allows Terraform to authenticate with AWS and perform necessary operations, such as creating a plan or applying changes.
+      - name: Configure AWS credentials for Dev
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+          aws-region: us-west-2  # Adjust the AWS region as needed
+
+    # This step initializes the Terraform working directory. It downloads the required providers, sets up the backend, and prepares the environment for further Terraform operations.
+      - name: Terraform Init
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform init
+
+    # Formatting the code with terraform fmt ensures that all Terraform configuration files adhere to a standard style, which improves readability and maintainability.
+      - name: Terraform fmt
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform fmt       
+
+    # This validation step checks the Terraform configuration files for syntax and logical errors, ensuring that the configuration is valid and ready to be applied.
+      - name: Terraform Validate
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform validate
+
+    # Running TFLint after validation further checks for best practices, potential issues, and deprecated syntax, ensuring that the code is clean, follows best practices, and is ready for deployment.
+      - name: TFLint Check
+        run: |
+          cd enviroments/dev/us-east-1
+          tflint --init
+          tflint
+
+    # This step uses Checkov to perform a comprehensive security and compliance scan of the Terraform configuration files. Checkov analyzes the code for potential misconfigurations, security vulnerabilities, and compliance violations, ensuring that your infrastructure-as-code adheres to industry best practices and organizational security standards before deployment.
+      # - name: Run Checkov
+      #   run: |
+      #     cd enviroments/dev/us-east-1
+      #     checkov -d .    
+
+
+      # - name: Checkov GitHub Action
+      #   uses: bridgecrewio/checkov-action@v12
+      #   with:
+      #     # This will add both a CLI output to the console and create a results.sarif file
+      #     directory: ./enviroments/dev/us-east-1
+      #     output_format: cli,sarif
+      #     output_file_path: console,results.sarif
+
+    # This security check is critical for identifying potential security risks in the Terraform code before deployment, helping to mitigate security vulnerabilities in the infrastructure.
+      # - name: tfsec Security Check
+      #   run: |
+      #     cd enviroments/dev/us-east-1
+      #     tfsec
+
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          soft_fail: true
+          working_directory: ./enviroments/dev/us-east-1
+
+      - name: Render terraform docs inside the README.md and push changes back to PR branch
+        uses: terraform-docs/gh-actions@v1.2.0
+        with:
+         working-dir: .
+         output-file: README.md
+         output-method: inject
+         git-push: "true"
+         recursive: true
+         recursive-path: .
+
+
+      # terraform plan generates an execution plan showing what changes will be made to the infrastructure. Saving the plan to a file allows for later review and approval before applying any changes.
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform plan -out=tfplan
+       
+
+  Terraform-unit-test-plan-uat-env:
+    runs-on: ubuntu-latest
+    needs: Terraform-unit-test-plan-dev-env
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+
+      - name: Install TFLint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+      - name: Install tfsec
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
+      - name: Configure AWS credentials for QA
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.oidc_role_uat_arn }}
+          aws-region: us-west-2  # Adjust the AWS region as needed
+
+      - name: Terraform Init
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform init
+          
+      - name: Terraform fmt
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform fmt
+      - name: Terraform Validate
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform validate
+
+      - name: TFLint Check
+        run: |
+          cd enviroments/uat/us-west-2
+          tflint --init
+          tflint
+
+      # - name: tfsec Security Check
+      #   run: |
+      #     cd enviroments/uat/us-west-2
+      #     tfsec
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform plan -out=tfplan
+
+
+

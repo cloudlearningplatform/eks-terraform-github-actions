@@ -1,0 +1,85 @@
+name: Terraform Destroy Pipeline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  destroy-on-dev:
+    runs-on: ubuntu-latest
+    if: contains('["talukder9712"]', github.actor)
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Confirm compatibility or update if newer version available
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2  # Check if a newer version is available that supports Node.js 20
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+
+      - name: Configure AWS credentials for Dev
+        uses: aws-actions/configure-aws-credentials@v3  # Confirm compatibility or update if newer version available
+        with:
+          role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+          aws-region: us-west-2  # Adjust the AWS region as needed
+
+      - name: Terraform Init
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform init
+
+      - name: Terraform Plan Destroy
+        id: plan
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform plan -destroy -out=tfplan-destroy
+
+      - name: Terraform Apply Destroy
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform apply -auto-approve tfplan-destroy
+
+
+
+  destroy-on-uat:
+    runs-on: ubuntu-latest
+    needs: destroy-on-dev
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Confirm compatibility or update if newer version available
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2  # Check if a newer version is available that supports Node.js 20
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+
+      - name: Configure AWS credentials for UAT
+        uses: aws-actions/configure-aws-credentials@v3  # Confirm compatibility or update if newer version available
+        with:
+          role-to-assume: ${{ secrets.oidc_role_uat_arn }}
+          aws-region: us-west-2   # Adjust the AWS region as needed
+
+      - name: Terraform Init
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform init
+
+      - name: Terraform Plan Destroy
+        id: plan
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform plan -destroy -out=tfplan-destroy
+
+      - name: Terraform Apply Destroy
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform apply -auto-approve tfplan-destroy
+
+

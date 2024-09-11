@@ -1,0 +1,107 @@
+name: Terraform Multi-Account Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: 
+      - closed
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+
+      - name: Configure AWS credentials for Dev
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+          aws-region: us-west-2  # Adjust the AWS region as needed
+
+      - name: Terraform Init
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform init
+
+      - name: Terraform Validate
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd enviroments/dev/us-east-1
+          terraform apply -input=false -auto-approve tfplan
+
+  deploy-uat:
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0  # Adjust the Terraform version as needed
+
+      - name: Configure AWS credentials for QA
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.oidc_role_uat_arn }}
+          aws-region: us-west-2  # Adjust the AWS region as needed
+
+      - name: Terraform Init
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform init
+
+      - name: Terraform fmt
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform fmt    
+          
+      - name: Terraform Validate
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform plan -out=tfplan
+
+      - uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GIT_TOKEN }}
+          approvers: talukder9712,adeelahmedzeerak
+          minimum-approvals: 1
+          issue-body: Please ! Review & Approve to continue
+          exclude-workflow-initiator-as-approver: false   
+
+      - name: Terraform Apply
+        run: |
+          cd enviroments/uat/us-west-2
+          terraform apply -input=false -auto-approve tfplan
