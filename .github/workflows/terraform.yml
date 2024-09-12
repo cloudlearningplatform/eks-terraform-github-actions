@@ -157,10 +157,12 @@ jobs:
 
       
     - name: Terraform Plan
-      if: ${{ github.event.inputs.action  == 'plan' }}
+      if: ${{ github.event.inputs.action == 'plan' }}
       working-directory: eks
-      # Generates an execution plan for Terraform
       run: |
+        echo "Running terraform plan in directory: $(pwd)"
+        echo "Listing files in eks directory:"
+        ls -al
         echo "Running terraform plan with file: ${{ github.event.inputs.tfvars_file }}"
         terraform plan -var-file=${{ github.event.inputs.tfvars_file }} -input=false
 
