@@ -161,16 +161,7 @@ jobs:
       working-directory: eks
       # Generates an execution plan for Terraform
       run: |
+        echo "Running terraform plan with file: ${{ github.event.inputs.tfvars_file }}"
         terraform plan -var-file=${{ github.event.inputs.tfvars_file }} -input=false
 
-    
-      # Apply the Terraform Configuration according to the parameter
-    - name: Terraform Action
-      if: ${{ github.event.inputs.action  == 'apply' }}
-      working-directory: eks
-      run: terraform ${{ github.event.inputs.action }} -auto-approve -var-file=${{ github.event.inputs.tfvars_file }} -input=false
-
-    - name: Terraform Destroy
-      if: ${{ github.event.inputs.action == 'destroy' }}
-      working-directory: eks
-      run: terraform ${{ github.event.inputs.action }} -auto-approve -var-file=${{ github.event.inputs.tfvars_file }} -input=false
+  
