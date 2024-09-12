@@ -2,6 +2,7 @@ locals {
   cluster-name = var.cluster-name
 }
 
+# Create VPC
 resource "aws_vpc" "vpc" {
   cidr_block           = var.cidr-block
   instance_tenancy     = "default"
@@ -11,22 +12,23 @@ resource "aws_vpc" "vpc" {
   tags = {
     Name = var.vpc-name
     Env  = var.env
-
   }
 }
 
+# Create Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.vpc.id
 
   tags = {
     Name                                          = var.igw-name
-    env                                           = var.env
+    Env                                           = var.env
     "kubernetes.io/cluster/${local.cluster-name}" = "owned"
   }
 
   depends_on = [aws_vpc.vpc]
 }
 
+# Create Public Subnets
 resource "aws_subnet" "public-subnet" {
   count                   = var.pub-subnet-count
   vpc_id                  = aws_vpc.vpc.id
@@ -41,10 +43,10 @@ resource "aws_subnet" "public-subnet" {
     "kubernetes.io/role/elb"                      = "1"
   }
 
-  depends_on = [aws_vpc.vpc,
-  ]
+  depends_on = [aws_vpc.vpc]
 }
 
+# Create Private Subnets
 resource "aws_subnet" "private-subnet" {
   count                   = var.pri-subnet-count
   vpc_id                  = aws_vpc.vpc.id
@@ -59,11 +61,10 @@ resource "aws_subnet" "private-subnet" {
     "kubernetes.io/role/internal-elb"             = "1"
   }
 
-  depends_on = [aws_vpc.vpc,
-  ]
+  depends_on = [aws_vpc.vpc]
 }
 
-
+# Create Public Route Table
 resource "aws_route_table" "public-rt" {
   vpc_id = aws_vpc.vpc.id
 
@@ -74,23 +75,22 @@ resource "aws_route_table" "public-rt" {
 
   tags = {
     Name = var.public-rt-name
-    env  = var.env
+    Env  = var.env
   }
 
-  depends_on = [aws_vpc.vpc
-  ]
+  depends_on = [aws_vpc.vpc]
 }
 
-resource "aws_route_table_association" "name" {
-  count          = 3
+# Associate Public Subnets with Route Table
+resource "aws_route_table_association" "public-rt-association" {
+  count          = var.pub-subnet-count
   route_table_id = aws_route_table.public-rt.id
   subnet_id      = aws_subnet.public-subnet[count.index].id
 
-  depends_on = [aws_vpc.vpc,
-    aws_subnet.public-subnet
-  ]
+  depends_on = [aws_vpc.vpc, aws_subnet.public-subnet]
 }
 
+# Create Elastic IP for NAT Gateway
 resource "aws_eip" "ngw-eip" {
   domain = "vpc"
 
@@ -98,11 +98,10 @@ resource "aws_eip" "ngw-eip" {
     Name = var.eip-name
   }
 
-  depends_on = [aws_vpc.vpc
-  ]
-
+  depends_on = [aws_vpc.vpc]
 }
 
+# Create NAT Gateway
 resource "aws_nat_gateway" "ngw" {
   allocation_id = aws_eip.ngw-eip.id
   subnet_id     = aws_subnet.public-subnet[0].id
@@ -111,11 +110,10 @@ resource "aws_nat_gateway" "ngw" {
     Name = var.ngw-name
   }
 
-  depends_on = [aws_vpc.vpc,
-    aws_eip.ngw-eip
-  ]
+  depends_on = [aws_vpc.vpc, aws_eip.ngw-eip]
 }
 
+# Create Private Route Table
 resource "aws_route_table" "private-rt" {
   vpc_id = aws_vpc.vpc.id
 
@@ -126,26 +124,25 @@ resource "aws_route_table" "private-rt" {
 
   tags = {
     Name = var.private-rt-name
-    env  = var.env
+    Env  = var.env
   }
 
-  depends_on = [aws_vpc.vpc,
-  ]
+  depends_on = [aws_vpc.vpc, aws_nat_gateway.ngw]
 }
 
+# Associate Private Subnets with Route Table
 resource "aws_route_table_association" "private-rt-association" {
-  count          = 3
+  count          = var.pri-subnet-count
   route_table_id = aws_route_table.private-rt.id
   subnet_id      = aws_subnet.private-subnet[count.index].id
 
-  depends_on = [aws_vpc.vpc,
-    aws_subnet.private-subnet
-  ]
+  depends_on = [aws_vpc.vpc, aws_subnet.private-subnet]
 }
 
+# Create Security Group for EKS Cluster
 resource "aws_security_group" "eks-cluster-sg" {
   name        = var.eks-sg
-  description = "Allow 443 from Jump Server only"
+  description = "Allow 443 from specified IP range"
 
   vpc_id = aws_vpc.vpc.id
 
@@ -153,7 +150,7 @@ resource "aws_security_group" "eks-cluster-sg" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] // It should be specific IP range
+    cidr_blocks = ["0.0.0.0/0"]  # Update to restrict access based on your requirements
   }
 
   egress {
@@ -166,4 +163,6 @@ resource "aws_security_group" "eks-cluster-sg" {
   tags = {
     Name = var.eks-sg
   }
+
+  depends_on = [aws_vpc.vpc]
 }
