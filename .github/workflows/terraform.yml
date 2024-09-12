@@ -87,6 +87,12 @@ jobs:
         
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+        aws-region: ${{ env.AWS_REGION }}  
       
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
