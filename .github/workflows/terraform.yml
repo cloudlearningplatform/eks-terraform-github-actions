@@ -72,7 +72,7 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version: 1.8.4
+        terraform_version: 1.9.3
 
   Terraform-Initializing:
     runs-on: ubuntu-latest
