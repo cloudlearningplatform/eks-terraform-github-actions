@@ -2,20 +2,20 @@ name: 'Terraform'
 
 on:
   workflow_dispatch:
-    # inputs:
-    #   tfvars_file:
-    #     description: 'Path to the .tfvars file'
-    #     required: true
-    #     default: 'dev.tfvars'
-    #   action:
-    #     type: choice
-    #     description: 'Apply or Destroy'
-    #     options:
-    #     - plan
-    #     - apply
-    #     - destroy
-    #     required: true
-    #     default: 'apply'
+    inputs:
+      tfvars_file:
+        description: 'Path to the .tfvars file'
+        required: true
+        default: 'dev.tfvars'
+      action:
+        type: choice
+        description: 'Apply or Destroy'
+        options:
+        - plan
+        - apply
+        - destroy
+        required: true
+        default: 'apply'
 
 env:
       AWS_REGION: us-east-1
@@ -159,9 +159,23 @@ jobs:
       run: ls -al eks  
     
     - name: Terraform Plan
+      if: ${{ github.event.inputs.action  == 'plan' }}
+      working-directory: eks
+      # Generates an execution plan for Terraform
       run: |
-        echo "Running terraform plan with file: eks/dev.tfvars"
-        terraform plan -var-file=eks/dev.tfvars -input=false
+        terraform plan -var-file=${{ github.event.inputs.tfvars_file }} -input=false
+
+    
+      # Apply the Terraform Configuration according to the parameter
+    - name: Terraform Action
+      if: ${{ github.event.inputs.action  == 'apply' }}
+      working-directory: eks
+      run: terraform ${{ github.event.inputs.action }} -auto-approve -var-file=${{ github.event.inputs.tfvars_file }} -input=false
+
+    - name: Terraform Destroy
+      if: ${{ github.event.inputs.action == 'destroy' }}
+      working-directory: eks
+      run: terraform ${{ github.event.inputs.action }} -auto-approve -var-file=${{ github.event.inputs.tfvars_file }} -input=false
   
 
   
