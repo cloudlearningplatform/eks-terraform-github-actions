@@ -112,6 +112,12 @@ jobs:
       uses: hashicorp/setup-terraform@v1
       with:
         terraform_version: 1.9.3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+        aws-region: ${{ env.AWS_REGION }}    
         
     - name: Terraform Init
       working-directory: eks
@@ -139,6 +145,12 @@ jobs:
       uses: hashicorp/setup-terraform@v1
       with:
         terraform_version: 1.9.3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        role-to-assume: ${{ secrets.oidc_role_dev_arn}}
+        aws-region: ${{ env.AWS_REGION }}    
 
     - name: Terraform Init
       working-directory: eks
