@@ -11,7 +11,7 @@ terraform {
     region         = "us-east-1"
     key            = "eks/terraform.tfstate"
     dynamodb_table = "terraform-state-table"
-    encrypt        = true
+    # encrypt        = true
   }
 }
 
