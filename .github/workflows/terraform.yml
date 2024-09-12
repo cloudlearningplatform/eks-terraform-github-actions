@@ -2,20 +2,20 @@ name: 'Terraform'
 
 on:
   workflow_dispatch:
-    inputs:
-      tfvars_file:
-        description: 'Path to the .tfvars file'
-        required: true
-        default: 'dev.tfvars'
-      action:
-        type: choice
-        description: 'Apply or Destroy'
-        options:
-        - plan
-        - apply
-        - destroy
-        required: true
-        default: 'apply'
+    # inputs:
+    #   tfvars_file:
+    #     description: 'Path to the .tfvars file'
+    #     required: true
+    #     default: 'dev.tfvars'
+    #   action:
+    #     type: choice
+    #     description: 'Apply or Destroy'
+    #     options:
+    #     - plan
+    #     - apply
+    #     - destroy
+    #     required: true
+    #     default: 'apply'
 
 env:
       AWS_REGION: us-east-1
