@@ -103,8 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: Terraform-Initializing
 
-    steps:
-        
+    steps:    
     - name: Checkout repository
       uses: actions/checkout@v4
       
